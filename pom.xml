@@ -106,5 +106,12 @@
             <scope>provided</scope>
         </dependency>
 
+        <dependency>
+            <groupId>cn.paper_card</groupId>
+            <artifactId>PaperCardMirai</artifactId>
+            <version>1.4</version>
+            <scope>provided</scope>
+        </dependency>
+
     </dependencies>
 </project>

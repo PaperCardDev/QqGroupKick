@@ -1,6 +1,7 @@
 package cn.paper_card.qq_group_kick;
 
 import cn.paper_card.group_root_command.GroupRootCommandApi;
+import cn.paper_card.mirai.PaperCardMiraiApi;
 import cn.paper_card.player_qq_bind.QqBindApi;
 import cn.paper_card.qq_group_access.QqGroupAccessApi;
 import cn.paper_card.sponsorship.SponsorshipApi;
@@ -19,30 +20,53 @@ public final class QqGroupKick extends JavaPlugin implements QqGroupKickApi {
 
     private SponsorshipApi sponsorshipApi = null;
 
-    @Override
-    public void onEnable() {
+    private PaperCardMiraiApi paperCardMiraiApi = null;
+
+    private @Nullable QqBindApi getQqBindApi0() {
+        final Plugin plugin = getServer().getPluginManager().getPlugin("PlayerQqBind");
+        if (plugin instanceof final QqBindApi api) {
+            return api;
+        }
+        return null;
+    }
+
+    private @Nullable PaperCardMiraiApi getPaperCardMiraiApi0() {
+        final Plugin plugin = getServer().getPluginManager().getPlugin("PaperCardMirai");
+        if (plugin instanceof final PaperCardMiraiApi api) {
+            return api;
+        }
+        return null;
+    }
 
 
+    private @Nullable QqGroupAccessApi getQqGroupAccessApi0() {
         final Plugin plugin = getServer().getPluginManager().getPlugin("QqGroupAccess");
         if (plugin instanceof final QqGroupAccessApi api) {
-            this.qqGroupAccessApi = api;
+            return api;
         }
+        return null;
+    }
 
-        final Plugin plugin1 = getServer().getPluginManager().getPlugin("PlayerQqBind");
-        if (plugin1 instanceof final QqBindApi api) {
-            this.qqBindApi = api;
+    private @Nullable SponsorshipApi getSponsorshipApi0() {
+        final Plugin plugin = getServer().getPluginManager().getPlugin("Sponsorship");
+        if (plugin instanceof final SponsorshipApi api) {
+            return api;
         }
+        return null;
+    }
 
-        final Plugin plugin2 = getServer().getPluginManager().getPlugin("Sponsorship");
-        if (plugin2 instanceof final SponsorshipApi api) {
-            this.sponsorshipApi = api;
-        }
-
-        final Plugin plugin3 = getServer().getPluginManager().getPlugin("GroupRootCommand");
-        if (plugin3 instanceof final GroupRootCommandApi api) {
+    @Override
+    public void onEnable() {
+        final Plugin plugin = getServer().getPluginManager().getPlugin("GroupRootCommand");
+        if (plugin instanceof final GroupRootCommandApi api) {
             api.addCommandForAdminMainGroup(new MainCommand(this));
             getLogger().info("已添加踢出名单命令");
-        }
+        } else throw new NoSuchElementException("GroupRootCommand插件未安装！");
+
+        this.qqBindApi = this.getQqBindApi0();
+        this.paperCardMiraiApi = this.getPaperCardMiraiApi0();
+        this.qqGroupAccessApi = this.getQqGroupAccessApi0();
+        this.sponsorshipApi = this.getSponsorshipApi0();
     }
 
     @Nullable QqGroupAccessApi getQqGroupAccessApi() {
@@ -62,6 +86,14 @@ public final class QqGroupKick extends JavaPlugin implements QqGroupKickApi {
 
         final List<QqGroupAccessApi.GroupMember> allMembers = mainGroupAccess.getAllMembers();
 
+        // 获取所有机器人号
+        final HashSet<Long> botQqs;
+        if (this.paperCardMiraiApi != null) {
+            final List<Long> qqs = this.paperCardMiraiApi.getAccountStorage().queryAllQqs();
+            botQqs = new HashSet<>(qqs);
+        } else {
+            botQqs = null;
+        }
 
         final ArrayList<KickInfo> kickList = new ArrayList<>();
 
@@ -69,7 +101,9 @@ public final class QqGroupKick extends JavaPlugin implements QqGroupKickApi {
 
         // 获取所有未绑定的
         for (QqGroupAccessApi.GroupMember member : allMembers) {
-            final QqBindApi.BindInfo bindInfo = this.qqBindApi.queryByQq(member.getQq());
+            final long qq = member.getQq();
+
+            final QqBindApi.BindInfo bindInfo = this.qqBindApi.queryByQq(qq);
             if (bindInfo != null) continue; // 已经绑定
 
             // 忽略管理员
@@ -85,6 +119,9 @@ public final class QqGroupKick extends JavaPlugin implements QqGroupKickApi {
 
             // 忽略没有到1周的
             if (dayNo <= 7) continue;
+
+            // 忽略机器人号
+            if (botQqs != null && botQqs.contains(qq)) continue;
 
             kickList.add(new KickInfo(
                     member,
@@ -115,15 +152,26 @@ public final class QqGroupKick extends JavaPlugin implements QqGroupKickApi {
     public @NotNull List<KickInfo> generateOneDayPlayer(int max) throws Exception {
         if (this.qqGroupAccessApi == null) throw new Exception("QqGroupAccess插件未安装！");
         if (this.qqBindApi == null) throw new Exception("PlayerQqBind插件未安装！");
-        if (this.sponsorshipApi == null) throw new Exception("Sponsorship插件未安装！");
 
         final QqGroupAccessApi.GroupAccess mainGroupAccess = this.qqGroupAccessApi.createMainGroupAccess();
 
         final ArrayList<KickInfo> list = new ArrayList<>();
 
+        // 获取所有机器人号
+        final HashSet<Long> botQqs;
+        if (this.paperCardMiraiApi != null) {
+            final List<Long> qqs = this.paperCardMiraiApi.getAccountStorage().queryAllQqs();
+            botQqs = new HashSet<>(qqs);
+        } else {
+            botQqs = null;
+        }
+
+
         final long cur = System.currentTimeMillis();
 
         for (final QqGroupAccessApi.GroupMember member : mainGroupAccess.getAllMembers()) {
+
+            final long qq = member.getQq();
 
             // 忽略管理
             if (member.getPermissionLevel() > 0) continue;
@@ -139,8 +187,13 @@ public final class QqGroupKick extends JavaPlugin implements QqGroupKickApi {
             final UUID uuid = bindInfo.uuid();
 
             // 忽略有赞助记录的玩家
-            final int count = this.sponsorshipApi.queryCount(uuid);
-            if (count > 0) continue;
+            if (this.sponsorshipApi != null) {
+                final int count = this.sponsorshipApi.queryCount(uuid);
+                if (count > 0) continue;
+            }
+
+            // 忽略机器人号
+            if (botQqs != null && botQqs.contains(qq)) continue;
 
             final OfflinePlayer offlinePlayer = getServer().getOfflinePlayer(uuid);
 
@@ -167,6 +220,7 @@ public final class QqGroupKick extends JavaPlugin implements QqGroupKickApi {
                         )
                 ));
             }
+
         }
 
         // 排序
