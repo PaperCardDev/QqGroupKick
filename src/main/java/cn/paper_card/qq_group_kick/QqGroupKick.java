@@ -202,25 +202,39 @@ public final class QqGroupKick extends JavaPlugin implements QqGroupKickApi {
 
             final long oneDay = 24 * 60 * 60 * 1000L;
 
+            // 入群没到7天的不管
+            final long joinTime = member.getJoinTime() * 1000L;
+            if (cur < joinTime + oneDay * 7) continue;
+
             // 一日游玩家
             if (lastSeen - firstPlayed < 3 * oneDay && cur - lastSeen > 14 * oneDay) {
                 String name = offlinePlayer.getName();
                 if (name == null) name = offlinePlayer.getUniqueId().toString();
 
-                final long days = (cur - lastSeen) / oneDay;
+                if (lastSeen <= 0) {
+                    list.add(new KickInfo(
+                            member,
+                            name,
+                            offlinePlayer,
+                            "入群超过7天（%d天）未进过一次服务器".formatted(
+                                    (cur - joinTime) / oneDay
+                            )
+                    ));
 
-                list.add(new KickInfo(
-                        member,
-                        name,
-                        offlinePlayer,
-                        "一日游玩家，已%d天未上线，%d天前入群，活跃等级：%d".formatted(
-                                days,
-                                (cur - member.getJoinTime() * 1000L) / oneDay,
-                                member.getActiveLevel()
-                        )
-                ));
+                } else {
+                    final long days = (cur - lastSeen) / oneDay;
+                    list.add(new KickInfo(
+                            member,
+                            name,
+                            offlinePlayer,
+                            "一日游玩家，已%d天未上线，%d天前入群，活跃等级：%d".formatted(
+                                    days,
+                                    (cur - joinTime) / oneDay,
+                                    member.getActiveLevel()
+                            )
+                    ));
+                }
             }
-
         }
 
         // 排序
