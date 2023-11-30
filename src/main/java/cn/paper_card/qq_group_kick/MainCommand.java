@@ -1,6 +1,7 @@
 package cn.paper_card.qq_group_kick;
 
-import cn.paper_card.qq_group_access.QqGroupAccessApi;
+import cn.paper_card.qq_group_access.api.GroupAccess;
+import cn.paper_card.qq_group_access.api.QqGroupAccessApi;
 import cn.paper_card.qq_group_command.QqGroupCommand;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.jetbrains.annotations.NotNull;
@@ -34,6 +35,7 @@ class MainCommand extends QqGroupCommand.HasSub {
             super("生成");
             this.addSubCommand(new NotBind());
             this.addSubCommand(new OneDayPlayer());
+            this.addSubCommand(new LowLevelQq());
         }
 
         class NotBind extends QqGroupCommand {
@@ -112,6 +114,46 @@ class MainCommand extends QqGroupCommand.HasSub {
                 return new String[]{"生成一日游玩家名单成功，人数：%d".formatted(list.size())};
             }
         }
+
+        class LowLevelQq extends QqGroupCommand {
+
+            public LowLevelQq() {
+                super("低等级QQ");
+            }
+
+            @Override
+            public @Nullable String[] execute(@NotNull String[] args,
+                                              long sender, @NotNull String senderName,
+                                              long groupId, @NotNull String groupName) {
+
+                final String levelStr = args.length > 0 ? args[0] : null;
+
+                if (levelStr == null) {
+                    return new String[]{"必须提供参数：QQ等级"};
+                }
+
+                final int level;
+
+                try {
+                    level = Integer.parseInt(levelStr);
+                } catch (NumberFormatException e) {
+                    return new String[]{"%s 不是正确的QQ等级".formatted(levelStr)};
+                }
+
+                final List<QqGroupKickApi.KickInfo> list;
+
+                try {
+                    list = plugin.generateLowLevelMembers(level);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return new String[]{e.toString()};
+                }
+
+                kickList = list;
+
+                return new String[]{"生成QQ等级低于%d的成员名单成功，人数：%d".formatted(level, list.size())};
+            }
+        }
     }
 
     class DoKick extends QqGroupCommand {
@@ -132,13 +174,13 @@ class MainCommand extends QqGroupCommand.HasSub {
             final List<QqGroupKickApi.KickInfo> list = kickList;
             kickList = null;
 
-            final QqGroupAccessApi groupAccessApi = plugin.getQqGroupAccessApi();
-            if (groupAccessApi == null) return new String[]{"QqGroupAccess插件未安装！"};
+            final QqGroupAccessApi qqGroupAccessApi = plugin.getQqGroupAccessApi();
+            if (qqGroupAccessApi == null) return new String[]{"QqGroupAccess插件未安装！"};
 
-            final QqGroupAccessApi.GroupAccess mainGroupAccess;
+            final GroupAccess mainGroupAccess;
 
             try {
-                mainGroupAccess = groupAccessApi.createMainGroupAccess();
+                mainGroupAccess = qqGroupAccessApi.createMainGroupAccess();
             } catch (Exception e) {
                 e.printStackTrace();
                 return new String[]{e.toString()};
@@ -152,22 +194,38 @@ class MainCommand extends QqGroupCommand.HasSub {
                 @Override
                 public void accept(ScheduledTask task) {
                     if (list.isEmpty()) {
-                        mainGroupAccess.sendAtMessage(sender, "踢出任务已完成，成功踢出%d人，未能踢出%d人".formatted(
-                                kicked.get(), notKicked.get()
-                        ));
+                        try {
+                            mainGroupAccess.sendAtMessage(sender, "踢出任务已完成，成功踢出%d人，未能踢出%d人".formatted(
+                                    kicked.get(), notKicked.get()
+                            ));
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
                         return;
                     }
 
                     final QqGroupKickApi.KickInfo remove = list.remove(0);
 
                     // 发送理由
-                    mainGroupAccess.sendAtMessage(remove.groupMember().getQq(), "踢出理由：" + remove.reason());
+                    final String reason = remove.reason();
+                    if (reason != null && !reason.isEmpty()) {
+                        try {
+                            mainGroupAccess.sendAtMessage(remove.groupMember().getQq(), "踢出理由：" + remove.reason());
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+
                     try { // 踢出
-                        remove.groupMember().kick(remove.reason());
+                        remove.groupMember().kick(reason);
                         kicked.incrementAndGet();
                     } catch (Exception e) {
                         e.printStackTrace();
-                        mainGroupAccess.sendNormalMessage(e.getCause().toString());
+                        try {
+                            mainGroupAccess.sendNormalMessage(e.getCause().toString());
+                        } catch (Exception ex) {
+                            e.printStackTrace();
+                        }
                         notKicked.incrementAndGet();
                     }
 
