@@ -1,13 +1,13 @@
 package cn.paper_card.qq_group_kick;
 
 import cn.paper_card.group_root_command.GroupRootCommandApi;
-import cn.paper_card.mirai.PaperCardMiraiApi;
+import cn.paper_card.paper_card_mirai.api.PaperCardMiraiApi;
 import cn.paper_card.qq_bind.api.BindInfo;
 import cn.paper_card.qq_bind.api.QqBindApi;
 import cn.paper_card.qq_group_access.api.GroupAccess;
 import cn.paper_card.qq_group_access.api.GroupMember;
 import cn.paper_card.qq_group_access.api.QqGroupAccessApi;
-import cn.paper_card.sponsorship.SponsorshipApi;
+import cn.paper_card.sponsorship.api.SponsorshipApi2;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -21,25 +21,9 @@ public final class QqGroupKick extends JavaPlugin implements QqGroupKickApi {
     private QqGroupAccessApi qqGroupAccessApi = null;
     private QqBindApi qqBindApi = null;
 
-    private SponsorshipApi sponsorshipApi = null;
+    private SponsorshipApi2 sponsorshipApi = null;
 
     private PaperCardMiraiApi paperCardMiraiApi = null;
-
-    private @Nullable PaperCardMiraiApi getPaperCardMiraiApi0() {
-        final Plugin plugin = getServer().getPluginManager().getPlugin("PaperCardMirai");
-        if (plugin instanceof final PaperCardMiraiApi api) {
-            return api;
-        }
-        return null;
-    }
-
-    private @Nullable SponsorshipApi getSponsorshipApi0() {
-        final Plugin plugin = getServer().getPluginManager().getPlugin("Sponsorship");
-        if (plugin instanceof final SponsorshipApi api) {
-            return api;
-        }
-        return null;
-    }
 
     @Override
     public void onEnable() {
@@ -63,9 +47,19 @@ public final class QqGroupKick extends JavaPlugin implements QqGroupKickApi {
             this.getSLF4JLogger().warn("无法连接到" + QqGroupAccessApi.class.getSimpleName());
         }
 
-        this.paperCardMiraiApi = this.getPaperCardMiraiApi0();
+        this.paperCardMiraiApi = this.getServer().getServicesManager().load(PaperCardMiraiApi.class);
+        if (this.paperCardMiraiApi != null) {
+            this.getSLF4JLogger().info("已经连接到" + PaperCardMiraiApi.class.getSimpleName());
+        } else {
+            this.getSLF4JLogger().warn("无法连接到" + PaperCardMiraiApi.class.getSimpleName());
+        }
 
-        this.sponsorshipApi = this.getSponsorshipApi0();
+        this.sponsorshipApi = this.getServer().getServicesManager().load(SponsorshipApi2.class);
+        if (this.sponsorshipApi != null) {
+            this.getSLF4JLogger().info("已经连接到" + SponsorshipApi2.class.getSimpleName());
+        } else {
+            this.getSLF4JLogger().warn("无法连接到" + SponsorshipApi2.class.getSimpleName());
+        }
     }
 
     @Nullable QqGroupAccessApi getQqGroupAccessApi() {
@@ -88,7 +82,7 @@ public final class QqGroupKick extends JavaPlugin implements QqGroupKickApi {
         // 获取所有机器人号
         final HashSet<Long> botQqs;
         if (this.paperCardMiraiApi != null) {
-            final List<Long> qqs = this.paperCardMiraiApi.getAccountStorage().queryAllQqs();
+            final List<Long> qqs = this.paperCardMiraiApi.getQqAccountService().queryAllQqs();
             botQqs = new HashSet<>(qqs);
         } else {
             botQqs = null;
@@ -167,7 +161,7 @@ public final class QqGroupKick extends JavaPlugin implements QqGroupKickApi {
         // 获取所有机器人号
         final HashSet<Long> botQqs;
         if (this.paperCardMiraiApi != null) {
-            final List<Long> qqs = this.paperCardMiraiApi.getAccountStorage().queryAllQqs();
+            final List<Long> qqs = this.paperCardMiraiApi.getQqAccountService().queryAllQqs();
             botQqs = new HashSet<>(qqs);
         } else {
             botQqs = null;
@@ -195,7 +189,7 @@ public final class QqGroupKick extends JavaPlugin implements QqGroupKickApi {
 
             // 忽略有赞助记录的玩家
             if (this.sponsorshipApi != null) {
-                final int count = this.sponsorshipApi.queryCount(uuid);
+                final int count = this.sponsorshipApi.getSponsorshipService().queryCount(uuid);
                 if (count > 0) continue;
             }
 
@@ -272,6 +266,19 @@ public final class QqGroupKick extends JavaPlugin implements QqGroupKickApi {
 
         final GroupAccess mainGroupAccess = this.qqGroupAccessApi.createMainGroupAccess();
 
+        final ArrayList<KickInfo> list = getKickInfoList(level, mainGroupAccess);
+
+        list.sort((o1, o2) -> {
+            final long i1 = o1.extra();
+            final long i2 = o2.extra();
+            return Long.compare(i1, i2);
+        });
+
+        return list;
+    }
+
+    @NotNull
+    private static ArrayList<KickInfo> getKickInfoList(int level, GroupAccess mainGroupAccess) throws Exception {
         final List<GroupMember> allMembers = mainGroupAccess.getAllMembers();
         final ArrayList<KickInfo> list = new ArrayList<>();
         for (GroupMember m : allMembers) {
@@ -286,14 +293,10 @@ public final class QqGroupKick extends JavaPlugin implements QqGroupKickApi {
                 ));
             }
         }
-
-        list.sort((o1, o2) -> {
-            final long i1 = o1.extra();
-            final long i2 = o2.extra();
-            return Long.compare(i1, i2);
-        });
-
-
         return list;
+    }
+
+    void handleException(@NotNull Throwable e) {
+        this.getSLF4JLogger().error("", e);
     }
 }

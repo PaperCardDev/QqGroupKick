@@ -21,7 +21,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.8.1</version>
+                <version>3.11.0</version>
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
@@ -29,8 +29,13 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.2.4</version>
+                <version>3.5.1</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -105,16 +110,16 @@
         </dependency>
 
         <dependency>
-            <groupId>cn.paper_card</groupId>
-            <artifactId>Sponsorship</artifactId>
+            <groupId>com.github.PaperCardDev</groupId>
+            <artifactId>sponsorship-api</artifactId>
             <version>1.0</version>
             <scope>provided</scope>
         </dependency>
 
         <dependency>
-            <groupId>cn.paper_card</groupId>
-            <artifactId>PaperCardMirai</artifactId>
-            <version>1.4</version>
+            <groupId>com.github.PaperCardDev</groupId>
+            <artifactId>paper-card-mirai-api</artifactId>
+            <version>1.0</version>
             <scope>provided</scope>
         </dependency>
 

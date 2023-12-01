@@ -145,7 +145,7 @@ class MainCommand extends QqGroupCommand.HasSub {
                 try {
                     list = plugin.generateLowLevelMembers(level);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    plugin.handleException(e);
                     return new String[]{e.toString()};
                 }
 
@@ -182,7 +182,7 @@ class MainCommand extends QqGroupCommand.HasSub {
             try {
                 mainGroupAccess = qqGroupAccessApi.createMainGroupAccess();
             } catch (Exception e) {
-                e.printStackTrace();
+                plugin.handleException(e);
                 return new String[]{e.toString()};
             }
 
@@ -199,7 +199,7 @@ class MainCommand extends QqGroupCommand.HasSub {
                                     kicked.get(), notKicked.get()
                             ));
                         } catch (Exception e) {
-                            e.printStackTrace();
+                            plugin.handleException(e);
                         }
                         return;
                     }
@@ -212,7 +212,7 @@ class MainCommand extends QqGroupCommand.HasSub {
                         try {
                             mainGroupAccess.sendAtMessage(remove.groupMember().getQq(), "踢出理由：" + remove.reason());
                         } catch (Exception e) {
-                            e.printStackTrace();
+                            plugin.handleException(e);
                         }
                     }
 
@@ -220,11 +220,11 @@ class MainCommand extends QqGroupCommand.HasSub {
                         remove.groupMember().kick(reason);
                         kicked.incrementAndGet();
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        plugin.handleException(e);
                         try {
                             mainGroupAccess.sendNormalMessage(e.getCause().toString());
                         } catch (Exception ex) {
-                            e.printStackTrace();
+                            plugin.handleException(e);
                         }
                         notKicked.incrementAndGet();
                     }
